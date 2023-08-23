@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env};
 
 pub async fn send_to_webhook(quote: String) -> Result<(), Box<dyn std::error::Error>> {
-    let webhook_url = env::var("DISCORD_WEBHOOK_URL").unwrap();
+    let webhook_url = env::var("DISCORD_WEBHOOK_URL").expect("Error! Discord webhook not set!");
     // print!("Discord URL {:?}", webhook_url);
 
     let client = reqwest::Client::new();

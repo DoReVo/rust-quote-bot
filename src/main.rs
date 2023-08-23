@@ -1,13 +1,19 @@
 mod discord;
 mod quote;
 
+use axum::{response::Html, routing::get, Router};
+use std::net::SocketAddr;
 use tokio_cron_scheduler::{Job, JobScheduler};
+
+async fn handler() -> Html<&'static str> {
+    Html("<h1>Hello, World!</h1>")
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sched = JobScheduler::new().await?;
 
-    let job = Job::new_async("0 0 * * * * *", |_uuid, mut _l| {
+    let job = Job::new_async("0 */1 * * * * *", |_uuid, mut _l| {
         Box::pin(async move {
             println!("Running quote bot");
             let quote = quote::get_quote().await.unwrap();
@@ -21,42 +27,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
     .unwrap();
 
-    let job2 = Job::new_async("* * * * * * *", |uuid, mut l| {
-        Box::pin(async move {
-            println!("I run async every 7 seconds");
-
-            // Query the next execution time for this job
-            let next_tick = l.next_tick_for_job(uuid).await;
-            match next_tick {
-                Ok(Some(ts)) => println!("Next time for 7s job is {:?}", ts),
-                _ => println!("Could not get next tick for 7s job"),
-            }
-        })
-    })
-    .unwrap();
-
     // Add async job
     sched.add(job).await?;
-    // Add async job
-    sched
-        .add(Job::new_async("1/7 * * * * *", |uuid, mut l| {
-            Box::pin(async move {
-                println!("I run async every 7 seconds");
-
-                // Query the next execution time for this job
-                let next_tick = l.next_tick_for_job(uuid).await;
-                match next_tick {
-                    Ok(Some(ts)) => println!("Next time for 7s job is {:?}", ts),
-                    _ => println!("Could not get next tick for 7s job"),
-                }
-            })
-        })?)
-        .await?;
 
     sched.start().await?;
 
     // Start the scheduler
     // tokio::spawn(sched.start());
+
+    // build our application with a route
+    let app = Router::new().route("/", get(handler));
+
+    // run it
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3003));
+    println!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     println!("Finished all cron task");
 
